@@ -5,3 +5,4 @@ __pycache__/
 *.log
 scan_log.txt
 .DS_Store
+.env
