@@ -2,3 +2,4 @@ streamlit
 psutil
 plotly
 azure-storage-blob
+pandas
