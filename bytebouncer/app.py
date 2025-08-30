@@ -107,6 +107,11 @@ exclude_system = st.sidebar.checkbox("Exclude system folders (Windows, Program F
 
 if st.sidebar.button("Scan Selected Drives"):
     with st.spinner("Scanning drives..."):
+        # Delete old scan_log.txt if it exists
+        try:
+            os.remove("scan_log.txt")
+        except FileNotFoundError:
+            pass
         scan_paths = [d + "\\" for d in selected_drives]
         progress_bar = st.progress(0)
         log_file = open("scan_log.txt", "w", encoding="utf-8")
@@ -124,8 +129,23 @@ if st.sidebar.button("Scan Selected Drives"):
 files = st.session_state.get('files', [])
 
 if files:
+
     import pandas as pd
+    # Add a symbol for each category and HTML tooltip
+    category_symbols = {
+        'System-critical': '🛑',
+        'Temporary/Junk': '🗑️',
+        'Large Media/Archive': '🗄️',
+        'User-generated': '📄',
+        'Other': '❓'
+    }
     df = pd.DataFrame(files)
+    def symbol_with_tooltip(row):
+        sym = category_symbols.get(row['category'], '')
+        cat = row['category']
+        return f'<span title="{cat}">{sym}</span>'
+    df['symbol'] = df.apply(symbol_with_tooltip, axis=1)
+
     # Pie chart: file categories
     pie = df['category'].value_counts().reset_index()
     pie.columns = ['Category', 'Count']
@@ -137,7 +157,10 @@ if files:
     top_files = df.sort_values('size', ascending=False).head(10)
     bar = px.bar(top_files, x='path', y='size', color='category', title='Top 10 Largest Files')
     st.plotly_chart(bar, use_container_width=True)
-    st.dataframe(top_files[['path', 'size', 'category']])
+    # Show table with tooltips using st.markdown and HTML
+    st.markdown("**Top 10 Largest Files** (hover over symbol for category)")
+    top_files_html = top_files[['symbol', 'path', 'size', 'category']].to_html(escape=False, index=False)
+    st.markdown(top_files_html, unsafe_allow_html=True)
 
     # Safe to Move
     st.subheader('Safe to Move Recommendations')
@@ -187,13 +210,18 @@ if files:
         selected_junk = st.multiselect('Select junk files to delete, archive, or upload:', junk_df['path'].tolist(), key='junk_select')
         if st.button('Delete Selected Junk Files'):
             deleted = 0
+            failed = []
             for path in selected_junk:
                 try:
                     os.remove(path)
                     deleted += 1
-                except Exception:
-                    continue
+                except Exception as e:
+                    failed.append((path, str(e)))
             st.success(f"Deleted {deleted} files.")
+            if failed:
+                st.warning(f"Failed to delete {len(failed)} files:")
+                for fpath, err in failed:
+                    st.text(f"{fpath}: {err}")
         if st.button('Archive Selected Junk Files (move to D:\\JunkArchive)'):
             archive_dir = r"D:\\JunkArchive"
             os.makedirs(archive_dir, exist_ok=True)
