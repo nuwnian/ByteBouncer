@@ -24,7 +24,10 @@ jobs:
 
       - name: Zip deployment package
         run: |
-          zip -r deploy.zip bytebouncer requirements.txt startup.sh
+          cd bytebouncer
+          zip -r ../deploy.zip .
+          cd ..
+          zip -g deploy.zip requirements.txt startup.sh
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
