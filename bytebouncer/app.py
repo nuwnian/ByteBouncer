@@ -15,7 +15,7 @@ from datetime import datetime
 # --- Helper Functions ---
 def scan_directory(root_dirs, exclude_system=True, progress_callback=None, log_callback=None):
     file_data = []
-    system_folders = [r"C:\\Windows", r"C:\\Program Files", r"C:\\Program Files (x86)"]
+    system_folders = [r"C:/Windows", r"C:/Program Files", r"C:/Program Files (x86)"]
     total_dirs = 0
     for root_dir in root_dirs:
         for _ in os.walk(root_dir):
@@ -23,21 +23,23 @@ def scan_directory(root_dirs, exclude_system=True, progress_callback=None, log_c
     scanned_dirs = 0
     for root_dir in root_dirs:
         for dirpath, _, filenames in os.walk(root_dir):
-            if exclude_system and any(dirpath.startswith(sf) for sf in system_folders):
+            # Normalize dirpath to use forward slashes
+            dirpath_posix = dirpath.replace('\\', '/')
+            if exclude_system and any(dirpath_posix.startswith(sf) for sf in system_folders):
                 continue
             for fname in filenames:
                 try:
-                    fpath = os.path.join(dirpath, fname)
+                    fpath = os.path.join(dirpath, fname).replace('\\', '/')
                     stat = os.stat(fpath)
                     file_info = {
-                        'path': fpath,
+                        'path': fpath.replace('\\', '/'),
                         'size': stat.st_size,
                         'type': Path(fpath).suffix.lower(),
                         'last_modified': datetime.fromtimestamp(stat.st_mtime)
                     }
                     file_data.append(file_info)
                     if log_callback:
-                        log_callback(fpath, stat.st_size)
+                        log_callback(fpath.replace('\\', '/'), stat.st_size)
                 except Exception:
                     continue
             scanned_dirs += 1
@@ -48,14 +50,15 @@ def scan_directory(root_dirs, exclude_system=True, progress_callback=None, log_c
     return file_data
 
 def categorize_file(f):
-    sys_paths = [r"C:\\Windows", r"C:\\Program Files", r"C:\\Program Files (x86)"]
+    sys_paths = [r"C:/Windows", r"C:/Program Files", r"C:/Program Files (x86)"]
     temp_exts = ['.tmp', '.log', '.bak']
-    temp_dirs = [os.environ.get('TEMP', ''), os.environ.get('TMP', '')]
+    temp_dirs = [os.environ.get('TEMP', '').replace('\\', '/'), os.environ.get('TMP', '').replace('\\', '/')]
     media_exts = ['.mp4', '.mp3', '.avi', '.mov', '.mkv', '.zip', '.rar', '.7z', '.tar', '.gz']
     user_exts = ['.docx', '.psd', '.jpg', '.png', '.pdf', '.xlsx', '.pptx', '.txt']
-    if any(f['path'].startswith(p) for p in sys_paths):
+    path_posix = f['path'].replace('\\', '/')
+    if any(path_posix.startswith(p) for p in sys_paths):
         return 'System-critical'
-    if any(f['type'] == ext for ext in temp_exts) or any(f['path'].startswith(td) for td in temp_dirs):
+    if any(f['type'] == ext for ext in temp_exts) or any(path_posix.startswith(td) for td in temp_dirs):
         return 'Temporary/Junk'
     if f['type'] in media_exts:
         return 'Large Media/Archive'
@@ -112,7 +115,7 @@ if st.sidebar.button("Scan Selected Drives"):
             os.remove("scan_log.txt")
         except FileNotFoundError:
             pass
-        scan_paths = [d + "\\" for d in selected_drives]
+        scan_paths = [d + "/" for d in selected_drives]
         progress_bar = st.progress(0)
         log_file = open("scan_log.txt", "w", encoding="utf-8")
         def progress_callback(p):
@@ -223,13 +226,13 @@ if files:
                 for fpath, err in failed:
                     st.text(f"{fpath}: {err}")
         if st.button('Archive Selected Junk Files (move to D:\\JunkArchive)'):
-            archive_dir = r"D:\\JunkArchive"
+            archive_dir = "D:/JunkArchive"
             os.makedirs(archive_dir, exist_ok=True)
             archived = 0
             for path in selected_junk:
                 try:
                     fname = os.path.basename(path)
-                    dest = os.path.join(archive_dir, fname)
+                    dest = os.path.join(archive_dir, fname).replace('\\', '/')
                     os.rename(path, dest)
                     archived += 1
                 except Exception:
